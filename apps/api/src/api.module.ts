@@ -4,6 +4,7 @@ import { TerminusModule } from '@nestjs/terminus';
 import { ApiController } from './api.controller';
 import { ApiService } from './api.service';
 import { DatabaseModule } from '@app/database';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { DatabaseModule } from '@app/database';
     }),
     TerminusModule,
     DatabaseModule,
+    WebhooksModule,
   ],
   controllers: [ApiController],
   providers: [ApiService],
