@@ -7,9 +7,7 @@ async function bootstrap() {
   console.log('Worker started');
   console.log(`NODE_ENV=${process.env.NODE_ENV}`);
   console.log(`AWS_ENDPOINT_URL=${process.env.AWS_ENDPOINT_URL}`);
-
-  // mantém o processo vivo no passo 1
-  process.stdin.resume();
+  console.log(`QUEUE_URL=${process.env.SQS_WEBHOOK_EVENTS_QUEUE_URL}`);
 
   const shutdown = async () => {
     await app.close();
@@ -19,4 +17,5 @@ async function bootstrap() {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 }
+
 bootstrap();

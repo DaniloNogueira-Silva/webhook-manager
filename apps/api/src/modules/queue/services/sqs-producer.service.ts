@@ -3,7 +3,7 @@ import { SendMessageCommand } from '@aws-sdk/client-sqs';
 import { sqsClient } from '@app/common';
 
 type PublishWebhookEventInput = {
-  eventId: string;
+  webhookRecordId: string;
   source: string;
   eventType: string;
   externalEventId?: string | null;
@@ -21,7 +21,7 @@ export class SqsProducerService {
     }
 
     const messageBody = JSON.stringify({
-      eventId: input.eventId,
+      webhookRecordId: input.webhookRecordId,
       source: input.source,
       eventType: input.eventType,
       externalEventId: input.externalEventId ?? null,

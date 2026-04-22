@@ -90,7 +90,7 @@ export class ReceiveWebhookService {
 
     try {
       await this.sqsProducerService.publishWebhookEvent({
-        eventId: created.id,
+        webhookRecordId: created.id,
         source: created.source,
         eventType: created.eventType,
         externalEventId: created.externalEventId,
