@@ -1,9 +1,9 @@
 generator client {
   provider               = "prisma-client"
   output                 = "../generated/prisma"
-  importFileExtension    = "ts"
   moduleFormat           = "cjs"
   generatedFileExtension = "ts"
+  importFileExtension    = "ts"
 }
 
 datasource db {
@@ -17,6 +17,21 @@ enum WebhookEventStatus {
   PROCESSED
   FAILED
   DEAD_LETTERED
+}
+
+enum PartnerAuthType {
+  HMAC
+  NONE
+  BEARER_TOKEN
+  BASIC
+  API_KEY
+}
+
+enum PartnerSignatureAlgorithm {
+  HMAC_SHA1
+  HMAC_SHA256
+  HMAC_SHA384
+  HMAC_SHA512
 }
 
 model WebhookRawEvent {
@@ -38,4 +53,36 @@ model WebhookRawEvent {
   @@index([status])
   @@index([receivedAt])
   @@map("webhook_raw_events")
+}
+
+model PartnerIntegration {
+  id       String  @id @default(uuid())
+  name     String
+  slug     String  @unique
+  isActive Boolean @default(true)
+
+  authType                  PartnerAuthType            @default(HMAC)
+  signatureAlgorithm        PartnerSignatureAlgorithm?
+  secret                    String?
+  signatureHeaderName       String?
+  signaturePrefix           String?
+  timestampHeaderName       String?
+  timestampToleranceSeconds Int?
+  signedPayloadTemplate     String?
+  authHeaderName            String?
+  bearerToken               String?
+  apiKeyHeaderName          String?
+  apiKeyValue               String?
+  basicUsername             String?
+  basicPassword             String?
+
+  eventTypePath        String?
+  externalEventIdPath  String?
+  deliveryIdHeaderName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("partner_integrations")
 }

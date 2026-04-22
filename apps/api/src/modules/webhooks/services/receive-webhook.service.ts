@@ -2,9 +2,14 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
 } from '@nestjs/common';
+import { SqsProducerService } from '../../queue/services/sqs-producer.service';
 import { WebhookEventsRepository } from '../repositories/webhook-events.repository';
+import { PartnerConfigService } from './partner-config.service';
+import { PayloadPathReaderService } from './payload-path-reader.service';
 import { WebhookSignatureValidatorService } from './webhook-signature-validator.service';
+import { WebhookEventStatus } from 'generated/prisma/enums';
 
 type ReceiveWebhookInput = {
   partner: string;
@@ -17,7 +22,10 @@ type ReceiveWebhookInput = {
 export class ReceiveWebhookService {
   constructor(
     private readonly webhookEventsRepository: WebhookEventsRepository,
+    private readonly partnerConfigService: PartnerConfigService,
+    private readonly payloadPathReaderService: PayloadPathReaderService,
     private readonly webhookSignatureValidatorService: WebhookSignatureValidatorService,
+    private readonly sqsProducerService: SqsProducerService,
   ) {}
 
   async execute(input: ReceiveWebhookInput) {
@@ -29,34 +37,50 @@ export class ReceiveWebhookService {
       throw new BadRequestException('Raw body is required');
     }
 
+    const partner = await this.partnerConfigService.getActivePartnerOrFail(
+      input.partner,
+    );
+
     this.webhookSignatureValidatorService.validate({
-      partner: input.partner,
+      partner,
       rawBody: input.rawBody,
       headers: input.headers,
     });
 
-    const eventType = this.extractEventType(input.payload);
-    const externalEventId = this.extractExternalEventId(input.payload);
-    const signature = this.extractSignature(input.headers);
+    const eventType =
+      this.payloadPathReaderService.getString(
+        input.payload,
+        partner.eventTypePath,
+      ) ?? 'unknown';
+
+    const externalEventId = this.payloadPathReaderService.getString(
+      input.payload,
+      partner.externalEventIdPath,
+    );
+
+    const signature = this.extractConfiguredSignature(
+      input.headers,
+      partner.signatureHeaderName,
+    );
 
     if (externalEventId) {
       const existing =
         await this.webhookEventsRepository.findBySourceAndExternalEventId(
-          input.partner,
+          partner.slug,
           externalEventId,
         );
 
       if (existing) {
         throw new ConflictException({
           message: 'Webhook already received',
-          source: input.partner,
+          source: partner.slug,
           externalEventId,
         });
       }
     }
 
     const created = await this.webhookEventsRepository.create({
-      source: input.partner,
+      source: partner.slug,
       eventType,
       externalEventId,
       signature,
@@ -64,67 +88,54 @@ export class ReceiveWebhookService {
       payloadJson: input.payload,
     });
 
-    return {
-      eventId: created.id,
-      status: created.status,
-    };
+    try {
+      await this.sqsProducerService.publishWebhookEvent({
+        eventId: created.id,
+        source: created.source,
+        eventType: created.eventType,
+        externalEventId: created.externalEventId,
+      });
+
+      const updated = await this.webhookEventsRepository.updateStatus(
+        created.id,
+        WebhookEventStatus.QUEUED,
+      );
+
+      return {
+        eventId: updated.id,
+        status: updated.status,
+      };
+    } catch (error) {
+      await this.webhookEventsRepository.updateStatusWithError(
+        created.id,
+        WebhookEventStatus.FAILED,
+        error instanceof Error ? error.message : 'Unknown queue publish error',
+      );
+
+      throw new InternalServerErrorException(
+        'Webhook persisted but failed to publish to queue',
+      );
+    }
   }
 
-  private extractEventType(payload: unknown): string {
-    if (
-      payload &&
-      typeof payload === 'object' &&
-      'eventType' in payload &&
-      typeof (payload as any).eventType === 'string'
-    ) {
-      return (payload as any).eventType;
+  private extractConfiguredSignature(
+    headers: Record<string, unknown>,
+    signatureHeaderName?: string | null,
+  ): string | null {
+    if (!signatureHeaderName) {
+      return null;
     }
 
-    if (
-      payload &&
-      typeof payload === 'object' &&
-      'type' in payload &&
-      typeof (payload as any).type === 'string'
-    ) {
-      return (payload as any).type;
+    const value = headers[signatureHeaderName.toLowerCase()];
+
+    if (typeof value === 'string' && value.length > 0) {
+      return value;
     }
 
-    return 'unknown';
-  }
-
-  private extractExternalEventId(payload: unknown): string | null {
-    if (
-      payload &&
-      typeof payload === 'object' &&
-      'id' in payload &&
-      typeof (payload as any).id === 'string'
-    ) {
-      return (payload as any).id;
-    }
-
-    if (
-      payload &&
-      typeof payload === 'object' &&
-      'eventId' in payload &&
-      typeof (payload as any).eventId === 'string'
-    ) {
-      return (payload as any).eventId;
+    if (Array.isArray(value) && typeof value[0] === 'string') {
+      return value[0];
     }
 
     return null;
-  }
-
-  private extractSignature(headers: Record<string, unknown>): string | null {
-    const candidates = [
-      headers['x-signature'],
-      headers['x-webhook-signature'],
-      headers['stripe-signature'],
-    ];
-
-    const signature = candidates.find(
-      (value) => typeof value === 'string' && value.length > 0,
-    );
-
-    return (signature as string) ?? null;
   }
 }

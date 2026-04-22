@@ -5,6 +5,7 @@ import { ApiController } from './api.controller';
 import { ApiService } from './api.service';
 import { DatabaseModule } from '@app/database';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { QueueModule } from './modules/queue/queue.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     TerminusModule,
     DatabaseModule,
     WebhooksModule,
+    QueueModule,
   ],
   controllers: [ApiController],
   providers: [ApiService],

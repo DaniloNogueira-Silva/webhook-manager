@@ -46,4 +46,25 @@ export class WebhookEventsRepository {
       },
     });
   }
+
+  async updateStatus(id: string, status: WebhookEventStatus) {
+    return this.prisma.webhookRawEvent.update({
+      where: { id },
+      data: { status },
+    });
+  }
+
+  async updateStatusWithError(
+    id: string,
+    status: WebhookEventStatus,
+    lastError: string,
+  ) {
+    return this.prisma.webhookRawEvent.update({
+      where: { id },
+      data: {
+        status,
+        lastError,
+      },
+    });
+  }
 }
