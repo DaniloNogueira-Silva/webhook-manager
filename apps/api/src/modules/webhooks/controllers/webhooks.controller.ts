@@ -26,7 +26,7 @@ export class WebhooksController {
     return this.receiveWebhookService.execute({
       partner,
       headers,
-      rawBody: request.rawBody,
+      rawBody: request.rawBody?.toString('utf8'),
       payload: body,
     });
   }

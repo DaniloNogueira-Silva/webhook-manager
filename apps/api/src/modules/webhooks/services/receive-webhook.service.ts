@@ -4,6 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { WebhookEventsRepository } from '../repositories/webhook-events.repository';
+import { WebhookSignatureValidatorService } from './webhook-signature-validator.service';
 
 type ReceiveWebhookInput = {
   partner: string;
@@ -16,6 +17,7 @@ type ReceiveWebhookInput = {
 export class ReceiveWebhookService {
   constructor(
     private readonly webhookEventsRepository: WebhookEventsRepository,
+    private readonly webhookSignatureValidatorService: WebhookSignatureValidatorService,
   ) {}
 
   async execute(input: ReceiveWebhookInput) {
@@ -26,6 +28,12 @@ export class ReceiveWebhookService {
     if (!input.rawBody) {
       throw new BadRequestException('Raw body is required');
     }
+
+    this.webhookSignatureValidatorService.validate({
+      partner: input.partner,
+      rawBody: input.rawBody,
+      headers: input.headers,
+    });
 
     const eventType = this.extractEventType(input.payload);
     const externalEventId = this.extractExternalEventId(input.payload);
@@ -46,13 +54,6 @@ export class ReceiveWebhookService {
         });
       }
     }
-
-    console.log('Webhook received', {
-      partner: input.partner,
-      rawBodyLength: input.rawBody.length,
-      eventType,
-      externalEventId,
-    });
 
     const created = await this.webhookEventsRepository.create({
       source: input.partner,
