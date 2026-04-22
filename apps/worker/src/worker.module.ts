@@ -1,3 +1,4 @@
+import { DatabaseModule } from '@app/database';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -7,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    DatabaseModule,
   ],
 })
 export class WorkerModule {}

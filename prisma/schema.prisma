@@ -1,9 +1,41 @@
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider               = "prisma-client"
+  output                 = "../generated/prisma"
+  importFileExtension    = "ts"
+  moduleFormat           = "cjs"
+  generatedFileExtension = "ts"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  QUEUED
+  PROCESSING
+  PROCESSED
+  FAILED
+  DEAD_LETTERED
+}
+
+model WebhookRawEvent {
+  id              String             @id @default(uuid())
+  source          String
+  eventType       String
+  externalEventId String?
+  signature       String?
+  headersJson     Json
+  payloadJson     Json
+  status          WebhookEventStatus @default(RECEIVED)
+  lastError       String?
+  receivedAt      DateTime           @default(now())
+  processedAt     DateTime?
+
+  @@unique([source, externalEventId])
+  @@index([source])
+  @@index([eventType])
+  @@index([status])
+  @@index([receivedAt])
+  @@map("webhook_raw_events")
 }

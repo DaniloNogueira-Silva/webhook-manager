@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TerminusModule } from '@nestjs/terminus';
 import { ApiController } from './api.controller';
 import { ApiService } from './api.service';
+import { DatabaseModule } from '@app/database';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { ApiService } from './api.service';
       envFilePath: '.env',
     }),
     TerminusModule,
+    DatabaseModule,
   ],
   controllers: [ApiController],
   providers: [ApiService],
