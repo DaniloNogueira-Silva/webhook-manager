@@ -5,9 +5,9 @@ import {
   ReceiveMessageCommand,
 } from '@aws-sdk/client-sqs';
 import { sqsClient } from '@app/common';
+import { WebhookEventStatus } from 'generated/prisma/enums';
 import { WebhookEventProcessorService } from '../../processing/services/webhook-event-processor.service';
 import { WebhookEventsWorkerRepository } from '../../repositories/webhook-events-worker.repository';
-import { WebhookEventStatus } from 'generated/prisma/enums';
 
 type QueueMessageBody = {
   webhookRecordId: string;
@@ -21,6 +21,9 @@ type QueueMessageBody = {
 export class WorkerOrchestratorService {
   private readonly logger = new Logger(WorkerOrchestratorService.name);
   private readonly queueUrl = process.env.SQS_WEBHOOK_EVENTS_QUEUE_URL!;
+  private readonly maxReceiveCount = Number(
+    process.env.SQS_MAX_RECEIVE_COUNT ?? 3,
+  );
   private isRunning = false;
 
   constructor(
@@ -100,11 +103,6 @@ export class WorkerOrchestratorService {
     }
 
     const webhookRecordId = parsedBody.webhookRecordId;
-    const approximateReceiveCount = message.Attributes?.ApproximateReceiveCount;
-
-    this.logger.log(
-      `Handling queue message webhookRecordId=${webhookRecordId} receiveCount=${approximateReceiveCount ?? 'unknown'}`,
-    );
 
     if (!webhookRecordId) {
       this.logger.error(
@@ -112,6 +110,14 @@ export class WorkerOrchestratorService {
       );
       return;
     }
+
+    const approximateReceiveCount = Number(
+      message.Attributes?.ApproximateReceiveCount ?? 1,
+    );
+
+    this.logger.log(
+      `Handling queue message webhookRecordId=${webhookRecordId} receiveCount=${approximateReceiveCount}`,
+    );
 
     try {
       await this.webhookEventProcessorService.process(webhookRecordId);
@@ -125,22 +131,34 @@ export class WorkerOrchestratorService {
         );
 
         this.logger.log(
-          `Deleted message from queue for eventId=${webhookRecordId}`,
+          `Deleted message from queue for webhookRecordId=${webhookRecordId}`,
         );
       }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown processing error';
+
       this.logger.error(
-        `Failed processing eventId=${webhookRecordId}: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
+        `Failed processing webhookRecordId=${webhookRecordId}: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
 
-      await this.webhookEventsWorkerRepository.updateStatusWithError(
-        webhookRecordId,
-        WebhookEventStatus.FAILED,
-        error instanceof Error ? error.message : 'Unknown processing error',
-      );
+      if (approximateReceiveCount >= this.maxReceiveCount) {
+        await this.webhookEventsWorkerRepository.markDeadLettered(
+          webhookRecordId,
+          errorMessage,
+        );
+
+        this.logger.warn(
+          `Marked webhookRecordId=${webhookRecordId} as DEAD_LETTERED`,
+        );
+      } else {
+        await this.webhookEventsWorkerRepository.updateStatusWithError(
+          webhookRecordId,
+          WebhookEventStatus.FAILED,
+          errorMessage,
+        );
+      }
     }
   }
 

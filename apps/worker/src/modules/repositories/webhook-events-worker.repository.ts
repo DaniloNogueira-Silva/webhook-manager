@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@app/database';
-import { WebhookEventStatus } from '../../../../../generated/prisma/client';
+import { WebhookEventStatus } from 'generated/prisma/enums';
 
 @Injectable()
 export class WebhookEventsWorkerRepository {
@@ -42,6 +42,16 @@ export class WebhookEventsWorkerRepository {
         status: WebhookEventStatus.PROCESSED,
         processedAt: new Date(),
         lastError: null,
+      },
+    });
+  }
+
+  async markDeadLettered(id: string, lastError: string) {
+    return this.prisma.webhookRawEvent.update({
+      where: { id },
+      data: {
+        status: WebhookEventStatus.DEAD_LETTERED,
+        lastError,
       },
     });
   }
