@@ -35,17 +35,18 @@ enum PartnerSignatureAlgorithm {
 }
 
 model WebhookRawEvent {
-  id              String             @id @default(uuid())
-  source          String
-  eventType       String
-  externalEventId String?
-  signature       String?
-  headersJson     Json
-  payloadJson     Json
-  status          WebhookEventStatus @default(RECEIVED)
-  lastError       String?
-  receivedAt      DateTime           @default(now())
-  processedAt     DateTime?
+  id                        String                     @id @default(uuid())
+  source                    String
+  eventType                 String
+  externalEventId           String?
+  signature                 String?
+  headersJson               Json
+  payloadJson               Json
+  status                    WebhookEventStatus         @default(RECEIVED)
+  lastError                 String?
+  receivedAt                DateTime                   @default(now())
+  processedAt               DateTime?
+  webhookProcessingAttempts WebhookProcessingAttempt[]
 
   @@unique([source, externalEventId])
   @@index([source])
@@ -85,4 +86,29 @@ model PartnerIntegration {
 
   @@index([isActive])
   @@map("partner_integrations")
+}
+
+enum WebhookProcessingAttemptStatus {
+  STARTED
+  SUCCEEDED
+  FAILED
+}
+
+model WebhookProcessingAttempt {
+  id             String                         @id @default(uuid())
+  webhookEventId String
+  attemptNumber  Int
+  status         WebhookProcessingAttemptStatus @default(STARTED)
+  errorMessage   String?
+  startedAt      DateTime                       @default(now())
+  finishedAt     DateTime?
+  latencyMs      Int?
+
+  webhookEvent WebhookRawEvent @relation(fields: [webhookEventId], references: [id], onDelete: Cascade)
+
+  @@unique([webhookEventId, attemptNumber])
+  @@index([webhookEventId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("webhook_processing_attempts")
 }

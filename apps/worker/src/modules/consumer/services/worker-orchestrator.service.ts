@@ -100,6 +100,11 @@ export class WorkerOrchestratorService {
     }
 
     const webhookRecordId = parsedBody.webhookRecordId;
+    const approximateReceiveCount = message.Attributes?.ApproximateReceiveCount;
+
+    this.logger.log(
+      `Handling queue message webhookRecordId=${webhookRecordId} receiveCount=${approximateReceiveCount ?? 'unknown'}`,
+    );
 
     if (!webhookRecordId) {
       this.logger.error(

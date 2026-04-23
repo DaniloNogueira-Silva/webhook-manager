@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { WebhookEventsWorkerRepository } from '../../repositories/webhook-events-worker.repository';
 import { WebhookEventStatus } from 'generated/prisma/enums';
+import { WebhookEventsWorkerRepository } from '../../repositories/webhook-events-worker.repository';
+import { ProcessingAttemptTrackerService } from './processing-attempt-tracker.service';
 
 @Injectable()
 export class WebhookEventProcessorService {
@@ -8,6 +9,7 @@ export class WebhookEventProcessorService {
 
   constructor(
     private readonly webhookEventsWorkerRepository: WebhookEventsWorkerRepository,
+    private readonly processingAttemptTrackerService: ProcessingAttemptTrackerService,
   ) {}
 
   async process(webhookRecordId: string) {
@@ -25,20 +27,42 @@ export class WebhookEventProcessorService {
       return;
     }
 
-    await this.webhookEventsWorkerRepository.updateStatus(
-      webhookRecordId,
-      WebhookEventStatus.PROCESSING,
-    );
+    const attempt =
+      await this.processingAttemptTrackerService.start(webhookRecordId);
 
-    this.logger.log(
-      `Processing event ${webhookRecordId} source=${event.source} type=${event.eventType}`,
-    );
+    try {
+      await this.webhookEventsWorkerRepository.updateStatus(
+        webhookRecordId,
+        WebhookEventStatus.PROCESSING,
+      );
 
-    await this.simulateBusinessProcessing(event.payloadJson);
+      this.logger.log(
+        `Processing event ${webhookRecordId} attempt=${attempt.attemptNumber} source=${event.source} type=${event.eventType}`,
+      );
 
-    await this.webhookEventsWorkerRepository.markProcessed(webhookRecordId);
+      await this.simulateBusinessProcessing(event.payloadJson);
 
-    this.logger.log(`Event processed successfully: ${webhookRecordId}`);
+      await this.webhookEventsWorkerRepository.markProcessed(webhookRecordId);
+      await this.processingAttemptTrackerService.succeed(
+        attempt.attemptId,
+        attempt.startedAt,
+      );
+
+      this.logger.log(
+        `Event processed successfully: ${webhookRecordId} attempt=${attempt.attemptNumber}`,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown processing error';
+
+      await this.processingAttemptTrackerService.fail(
+        attempt.attemptId,
+        attempt.startedAt,
+        errorMessage,
+      );
+
+      throw error;
+    }
   }
 
   private async simulateBusinessProcessing(payload: unknown) {

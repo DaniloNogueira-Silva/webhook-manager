@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { SqsProducerService } from '../../queue/services/sqs-producer.service';
 import { WebhookEventsRepository } from '../repositories/webhook-events.repository';
@@ -20,6 +21,8 @@ type ReceiveWebhookInput = {
 
 @Injectable()
 export class ReceiveWebhookService {
+  private readonly logger = new Logger(ReceiveWebhookService.name);
+
   constructor(
     private readonly webhookEventsRepository: WebhookEventsRepository,
     private readonly partnerConfigService: PartnerConfigService,
@@ -36,6 +39,10 @@ export class ReceiveWebhookService {
     if (!input.rawBody) {
       throw new BadRequestException('Raw body is required');
     }
+
+    this.logger.log(
+      `Starting to process webhook for partner: ${input.partner}`,
+    );
 
     const partner = await this.partnerConfigService.getActivePartnerOrFail(
       input.partner,
@@ -99,6 +106,10 @@ export class ReceiveWebhookService {
       const updated = await this.webhookEventsRepository.updateStatus(
         created.id,
         WebhookEventStatus.QUEUED,
+      );
+
+      this.logger.log(
+        `Webhook for partner ${partner.slug} and external event ID ${externalEventId} queued`,
       );
 
       return {
