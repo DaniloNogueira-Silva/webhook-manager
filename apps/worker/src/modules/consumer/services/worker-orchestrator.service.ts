@@ -8,6 +8,7 @@ import { sqsClient } from '@app/common';
 import { WebhookEventStatus } from 'generated/prisma/enums';
 import { WebhookEventProcessorService } from '../../processing/services/webhook-event-processor.service';
 import { WebhookEventsWorkerRepository } from '../../repositories/webhook-events-worker.repository';
+import { webhookDeadLetteredCounter } from '@app/common';
 
 type QueueMessageBody = {
   webhookRecordId: string;
@@ -148,6 +149,11 @@ export class WorkerOrchestratorService {
           webhookRecordId,
           errorMessage,
         );
+
+        webhookDeadLetteredCounter.inc({
+          partner: parsedBody.source,
+          event_type: parsedBody.eventType,
+        });
 
         this.logger.warn(
           `Marked webhookRecordId=${webhookRecordId} as DEAD_LETTERED`,

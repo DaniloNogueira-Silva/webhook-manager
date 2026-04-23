@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { WebhookEventsWorkerRepository } from '../../repositories/webhook-events-worker.repository';
-import { WebhookProcessingAttemptsRepository } from '../../repositories/webhook-processing-attempts.repository';
-import { ProcessingAttemptTrackerService } from './processing-attempt-tracker.service';
-import { WebhookEventProcessorService } from './webhook-event-processor.service';
+import { WebhookEventsWorkerRepository } from '../repositories/webhook-events-worker.repository';
+import { WebhookProcessingAttemptsRepository } from '../repositories/webhook-processing-attempts.repository';
+import { ProcessingAttemptTrackerService } from './services/processing-attempt-tracker.service';
+import { WebhookEventProcessorService } from './services/webhook-event-processor.service';
 
 @Module({
   providers: [

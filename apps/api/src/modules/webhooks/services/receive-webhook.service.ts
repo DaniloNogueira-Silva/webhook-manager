@@ -11,6 +11,7 @@ import { PartnerConfigService } from './partner-config.service';
 import { PayloadPathReaderService } from './payload-path-reader.service';
 import { WebhookSignatureValidatorService } from './webhook-signature-validator.service';
 import { WebhookEventStatus } from 'generated/prisma/enums';
+import { webhookQueuedCounter, webhookReceivedCounter } from '@app/common';
 
 type ReceiveWebhookInput = {
   partner: string;
@@ -47,6 +48,10 @@ export class ReceiveWebhookService {
     const partner = await this.partnerConfigService.getActivePartnerOrFail(
       input.partner,
     );
+
+    webhookReceivedCounter.inc({
+      partner: partner.slug,
+    });
 
     this.webhookSignatureValidatorService.validate({
       partner,
@@ -101,6 +106,10 @@ export class ReceiveWebhookService {
         source: created.source,
         eventType: created.eventType,
         externalEventId: created.externalEventId,
+      });
+
+      webhookQueuedCounter.inc({
+        partner: created.source,
       });
 
       const updated = await this.webhookEventsRepository.updateStatus(

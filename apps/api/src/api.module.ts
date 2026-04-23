@@ -5,6 +5,7 @@ import { ApiController } from './api.controller';
 import { DatabaseModule } from '@app/database';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { QueueModule } from './modules/queue/queue.module';
+import { ObservabilityModule } from './modules/observability/observability.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { QueueModule } from './modules/queue/queue.module';
     DatabaseModule,
     WebhooksModule,
     QueueModule,
+    ObservabilityModule,
   ],
   controllers: [ApiController],
 })

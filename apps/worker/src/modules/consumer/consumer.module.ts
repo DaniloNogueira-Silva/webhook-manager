@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SqsConsumerService } from './services/sqs-consumer.service';
 import { WorkerOrchestratorService } from './services/worker-orchestrator.service';
-import { ProcessingModule } from '../processing/services/processing.module';
+import { ProcessingModule } from '../processing/processing.module';
 
 @Module({
   imports: [ProcessingModule],

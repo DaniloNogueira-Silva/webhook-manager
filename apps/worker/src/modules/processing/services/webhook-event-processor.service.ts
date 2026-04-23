@@ -2,6 +2,11 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { WebhookEventStatus } from 'generated/prisma/enums';
 import { WebhookEventsWorkerRepository } from '../../repositories/webhook-events-worker.repository';
 import { ProcessingAttemptTrackerService } from './processing-attempt-tracker.service';
+import {
+  webhookFailedCounter,
+  webhookProcessedCounter,
+  webhookProcessingDurationMs,
+} from '@app/common';
 
 @Injectable()
 export class WebhookEventProcessorService {
@@ -13,6 +18,8 @@ export class WebhookEventProcessorService {
   ) {}
 
   async process(webhookRecordId: string) {
+    const startedAt = Date.now();
+
     const event =
       await this.webhookEventsWorkerRepository.findById(webhookRecordId);
 
@@ -48,6 +55,19 @@ export class WebhookEventProcessorService {
         attempt.startedAt,
       );
 
+      webhookProcessedCounter.inc({
+        partner: event.source,
+        event_type: event.eventType,
+      });
+
+      webhookProcessingDurationMs.observe(
+        {
+          partner: event.source,
+          event_type: event.eventType,
+        },
+        Date.now() - startedAt,
+      );
+
       this.logger.log(
         `Event processed successfully: ${webhookRecordId} attempt=${attempt.attemptNumber}`,
       );
@@ -59,6 +79,19 @@ export class WebhookEventProcessorService {
         attempt.attemptId,
         attempt.startedAt,
         errorMessage,
+      );
+
+      webhookFailedCounter.inc({
+        partner: event.source,
+        event_type: event.eventType,
+      });
+
+      webhookProcessingDurationMs.observe(
+        {
+          partner: event.source,
+          event_type: event.eventType,
+        },
+        Date.now() - startedAt,
       );
 
       throw error;
