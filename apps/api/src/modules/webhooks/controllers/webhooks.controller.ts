@@ -20,11 +20,25 @@ export class WebhooksController {
   @Post(':partner')
   @HttpCode(202)
   @ApiOperation({ summary: 'Receive a webhook from a partner' })
-  @ApiParam({ name: 'partner', description: 'The slug of the partner integration', type: 'string' })
-  @ApiResponse({ status: 202, description: 'Webhook received and queued successfully', type: ReceiveWebhookResponseDto })
-  @ApiResponse({ status: 400, description: 'Bad Request - Missing or invalid payload' })
+  @ApiParam({
+    name: 'partner',
+    description: 'The slug of the partner integration',
+    type: 'string',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Webhook received and queued successfully',
+    type: ReceiveWebhookResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Missing or invalid payload',
+  })
   @ApiResponse({ status: 404, description: 'Partner not found' })
-  @ApiResponse({ status: 409, description: 'Conflict - Webhook already received' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Webhook already received',
+  })
   async receive(
     @Param('partner') partner: string,
     @Headers() headers: Record<string, unknown>,
